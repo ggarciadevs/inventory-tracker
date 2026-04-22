@@ -1,71 +1,128 @@
-let total = 0;
-let expenses = [];
+let totalItems = 0;
+let inventory = [];
+let editItem = null;
 
-function addExpense() {
-  const name = document.getElementById("name").value;
-  const amount = document.getElementById("amount").value;
+function addItem() {
+  const name = document.getElementById("itemName").value;
+  const quantity = document.getElementById("quantity").value;
   const category = document.getElementById("category").value;
   const date = document.getElementById("date").value;
-  if (amount.trim() === "" || name.trim() === "") return;
+  if (quantity.trim() === "" || name.trim() === "") return;
 
-  const expense = {
-    name: name,
-    amount: Number(amount),
-    category: category,
-    date: date,
-    id: Date.now(),
-  };
-  expenses.push(expense);
+  if (editItem !== null) {
+    const item = inventory.find((i) => i.id === editItem);
 
-  localStorage.setItem("expenses", JSON.stringify(expenses));
+    item.name = name;
+    item.quantity = Number(quantity);
+    item.category = category;
+    item.date = date;
 
-  total += Number(amount);
+    editItem = null;
+  } else {
+    const item = {
+      name: name,
+      quantity: Number(quantity),
+      category: category,
+      date: date,
+      id: Date.now(),
+    };
+    inventory.push(item);
+  }
 
-  updateTotal();
+  localStorage.setItem("inventory", JSON.stringify(inventory));
 
-  addExpenseToDom(expense);
+  renderList(inventory);
 
-  document.getElementById("name").value = "";
-  document.getElementById("amount").value = "";
+  document.getElementById("itemName").value = "";
+  document.getElementById("quantity").value = "";
   document.getElementById("date").value = "";
 }
-function loadExpenses() {
-  const data = localStorage.getItem("expenses");
+
+function loadInventory() {
+  const data = localStorage.getItem("inventory");
 
   if (data) {
-    expenses = JSON.parse(data);
-
-    expenses.forEach((expense) => {
-      addExpenseToDom(expense);
-      total += expense.amount;
-    });
-
-    updateTotal();
+    inventory = JSON.parse(data);
+    renderList(inventory);
   }
 }
-function addExpenseToDom(expense) {
+
+function addItemToDom(item) {
   const li = document.createElement("li");
-  li.textContent = `${expense.name} (${expense.category}) - $${expense.amount} [${expense.date}]`;
+  li.textContent = `${item.name} (${item.category}) - Qty: ${item.quantity} [Stocked: ${item.date}]`;
 
-  const btn = document.createElement("button");
-  btn.textContent = "Delete";
-  btn.classList.add("delete-btn");
+  const deletebtn = document.createElement("button");
+  deletebtn.textContent = "Remove";
+  deletebtn.classList.add("delete-btn");
 
-  li.appendChild(btn);
+  deletebtn.onclick = () => {
+    inventory = inventory.filter((i) => i.id !== item.id);
 
-  btn.onclick = () => {
-    total -= expense.amount;
+    localStorage.setItem("inventory", JSON.stringify(inventory));
 
-    expenses = expenses.filter((e) => e.id !== expense.id);
-
-    localStorage.setItem("expenses", JSON.stringify(expenses));
-
-    updateTotal();
-    li.remove();
+    renderList(inventory);
   };
+
+  const editBtn = document.createElement("button");
+  editBtn.textContent = "Edit";
+  editBtn.classList.add("edit-btn");
+
+  editBtn.onclick = () => {
+    document.getElementById("itemName").value = item.name;
+    document.getElementById("quantity").value = item.quantity;
+    document.getElementById("category").value = item.category;
+    document.getElementById("date").value = item.date;
+
+    editItem = item.id;
+  };
+
+  const buttonContainer = document.createElement("div");
+  buttonContainer.classList.add("button-group");
+
+  buttonContainer.appendChild(deletebtn);
+  buttonContainer.appendChild(editBtn);
+
+  li.appendChild(buttonContainer);
   document.getElementById("list").appendChild(li);
 }
+
 function updateTotal() {
-  document.getElementById("total").textContent = "Total -$" + total.toFixed(2);
+  document.getElementById("totalItems").textContent =
+    "Total Items in Stock: " + totalItems;
 }
-loadExpenses();
+
+function renderList(filteredItems) {
+  document.getElementById("list").innerHTML = "";
+  totalItems = 0;
+
+  filteredItems.forEach((item) => {
+    addItemToDom(item);
+    totalItems += item.quantity;
+  });
+
+  updateTotal();
+}
+
+function filterItems() {
+  const searchValue = document
+    .getElementById("searchInput")
+    .value.toLowerCase();
+  const selectedCategory = document.getElementById("filterCategory").value;
+
+  const filtered = inventory.filter((item) => {
+    const matchesName = item.name.toLowerCase().includes(searchValue);
+    const matchesCategory =
+      selectedCategory === "All" || item.category === selectedCategory;
+
+    return matchesName && matchesCategory;
+  });
+
+  renderList(filtered);
+}
+
+document.getElementById("searchInput").addEventListener("input", filterItems);
+document
+  .getElementById("filterCategory")
+  .addEventListener("change", filterItems);
+
+loadInventory();
