@@ -9,29 +9,35 @@ function addItem() {
   const date = document.getElementById("date").value;
   if (quantity.trim() === "" || name.trim() === "") return;
 
-  if (editItem !== null) {
-    const item = inventory.find((i) => i.id === editItem);
+  const item = {
+    name: name,
+    quantity: Number(quantity),
+    category: category,
+    date: date,
+    id: editItem !== null ? editItem : Date.now(),
+  };
 
-    item.name = name;
-    item.quantity = Number(quantity);
-    item.category = category;
-    item.date = date;
-
-    editItem = null;
+  if (editItem != null) {
+    fetch(`http://localhost:3000/items/${editItem}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(item),
+    }).then(() => {
+      editItem = null;
+      loadInventory();
+    });
   } else {
-    const item = {
-      name: name,
-      quantity: Number(quantity),
-      category: category,
-      date: date,
-      id: Date.now(),
-    };
-    inventory.push(item);
+    //create POST
+    fetch("http://localhost:3000/items", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(item),
+    }).then(() => loadInventory());
   }
-
-  localStorage.setItem("inventory", JSON.stringify(inventory));
-
-  renderList(inventory);
 
   document.getElementById("itemName").value = "";
   document.getElementById("quantity").value = "";
@@ -39,12 +45,12 @@ function addItem() {
 }
 
 function loadInventory() {
-  const data = localStorage.getItem("inventory");
-
-  if (data) {
-    inventory = JSON.parse(data);
-    renderList(inventory);
-  }
+  fetch("http://localhost:3000/items")
+    .then((res) => res.json())
+    .then((data) => {
+      inventory = data;
+      renderList(inventory);
+    });
 }
 
 function addItemToDom(item) {
@@ -56,11 +62,9 @@ function addItemToDom(item) {
   deletebtn.classList.add("delete-btn");
 
   deletebtn.onclick = () => {
-    inventory = inventory.filter((i) => i.id !== item.id);
-
-    localStorage.setItem("inventory", JSON.stringify(inventory));
-
-    renderList(inventory);
+    fetch(`http://localhost:3000/items/${item.id}`, {
+      method: "DELETE",
+    }).then(() => loadInventory());
   };
 
   const editBtn = document.createElement("button");
