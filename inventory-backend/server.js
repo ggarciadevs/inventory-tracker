@@ -1,75 +1,128 @@
 const express = require("express");
 const cors = require("cors");
-// Initialize the app
+
 const app = express();
 const PORT = 3000;
 
-//middleware
-app.use(cors()); //allows front end to communicate with backend
-app.use(express.json()); //allows server to read incoming JSON data
+app.use(cors());
+app.use(express.json());
 
 const sqlite3 = require("sqlite3").verbose();
 const db = new sqlite3.Database("./inventory.db");
 
 db.run(`
-  CREATE TABLE IF NOT EXISTS items(
-  id INTEGER PRIMARY KEY,
-  name TEXT,
-  quantity INTEGER,
-  category TEXT, 
-  date TEXT
-  )
-  `);
-//GET all items
+    CREATE TABLE IF NOT EXISTS items(
+    id INTEGER PRIMARY KEY,
+    name TEXT,
+    quantity INTEGER,
+    category TEXT,
+    date TEXT, 
+    low_stock_threshold INTEGER, 
+    next_delivery TEXT 
+    )
+    `);
+
+app.listen(PORT, () => {
+  console.log(`server is running on http://localhost:${PORT}`);
+});
+//POST
+app.post("/items", (req, res) => {
+  const {
+    name,
+    quantity,
+    category,
+    date,
+    id,
+    low_stock_threshold,
+    next_delivery,
+  } = req.body;
+
+  const sql =
+    "INSERT INTO items (id, name, quantity, category, date, low_stock_threshold, next_delivery ) VALUES (?, ?, ?, ?, ?, ?, ?) ";
+  const params = [
+    id,
+    name,
+    quantity,
+    category,
+    date,
+    low_stock_threshold,
+    next_delivery,
+  ];
+
+  db.run(sql, params, function (err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(req.body);
+  });
+});
+//GET
 app.get("/items", (req, res) => {
   db.all("SELECT * FROM items", [], (err, rows) => {
-    if (err) return res.status(500).json(err);
+    if (err) {
+      return res.status(500).json(err);
+    }
     res.json(rows);
   });
 });
-//POST new item
 
-app.post("/items", (req, res) => {
-  const { name, quantity, category, date, id } = req.body;
-
-  db.run(
-    "INSERT INTO items (id, name, quantity, category, date) VALUES (?, ?, ?, ?, ?)",
-    [id, name, quantity, category, date],
-    function (err) {
-      if (err) return res.status(500).json(err);
-      res.json({ id, name, quantity, category, date });
-    },
-  );
+//Alerts
+app.get("/items/alerts", (req, res) => {
+  const sql = `
+    SELECT *
+    FROM items
+    WHERE quantity <= low_stock_threshold
+  `;
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    return res.json(rows);
+  });
 });
-//Delete Item
+//individual item
+app.get("/items/:id", (req, res) => {
+  const id = req.params.id;
+
+  const sql = `
+  SELECT *
+  FROM items
+  WHERE id = ?  
+  `;
+
+  db.get(sql, [id], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (!row) {
+      return res.status(404).json({ message: "Item not found" });
+    }
+    res.json(row);
+  });
+});
+//delete
+
 app.delete("/items/:id", (req, res) => {
-  db.run("DELETE FROM items WHERE id = ?", [req.params.id], function (err) {
-    if (err) return res.status(500).json(err);
+  const itemId = req.params.id;
+  db.run("DELETE FROM items WHERE id = ?", [itemId], function (err) {
+    if (err) {
+      return res.status(500).json(err);
+    }
     res.sendStatus(204);
   });
 });
-//update item
+// UPDATE item
 app.put("/items/:id", (req, res) => {
-  const { name, quantity, category, date } = req.body;
+  const { name, quantity, category, date, low_stock_threshold } = req.body;
+  const id = req.params.id;
 
-  db.run(
-    "UPDATE items SET name = ?, quantity = ?, category = ?, date = ? WHERE id = ?",
-    [name, quantity, category, date, req.params.id],
-    function (err) {
-      if (err) return res.status(500).json(err);
-      res.json(req.body);
-    },
-  );
-});
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+  const sql = `UPDATE items SET name = ?, quantity = ?, category = ?, date = ?, low_stock_threshold = ? WHERE id = ?`;
+  const params = [name, quantity, category, date, low_stock_threshold, id];
 
-// Test Route
-// app.get("/", (req, res) => {
-//   res.send("Backend is runningt");
-// });
-// //start server
-// app.listen(PORT, () => {
-//   console.log(`Server is running on http://localhost:${PORT}`);
-// });
+  db.run(sql, params, function (err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ message: "Update successful" });
+  });
+});
