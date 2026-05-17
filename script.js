@@ -15,6 +15,8 @@ function addItem() {
     category: category,
     date: date,
     id: editItem !== null ? editItem : Date.now(),
+    low_stock_threshold: 5,
+    next_delivery: "Unavailable",
   };
 
   if (editItem != null) {
@@ -64,7 +66,9 @@ function addItemToDom(item) {
   deletebtn.onclick = () => {
     fetch(`http://localhost:3000/items/${item.id}`, {
       method: "DELETE",
-    }).then(() => loadInventory());
+    }).then(() => {
+      loadInventory();
+    });
   };
 
   const editBtn = document.createElement("button");
